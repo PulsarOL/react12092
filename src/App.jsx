@@ -1,121 +1,114 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useState, useEffect, useRef } from 'react'
+import { db } from './firebase'
+import {
+    addDoc,
+    collection,
+    serverTimestamp,
+    onSnapshot,
+    query,
+    orderBy
+} from 'firebase/firestore'
+
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+    const [message, setMessage] = useState('')
+    const [messages, setMessages] = useState([])
+    const [sender, setSender] = useState('Ольга')
+    const messagesEndRef = useRef(null)
+    useEffect(() => {
+        const q = query(
+            collection(db, 'messages'),
+            orderBy('createdAt', 'asc')
+        )
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const messagesData = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data()
+            }))
+
+            setMessages(messagesData)
+        })
+
+        return () => unsubscribe()
+    }, [])
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({
+            behavior: 'smooth'
+        })
+    }, [messages])
+
+  const sendMessage = async () => {
+    const text = message.trim()
+    if (!text) return
+
+
+      await addDoc(collection(db, 'messages'), {
+          text: text,
+          sender: sender,
+          createdAt: serverTimestamp()
+      })
+
+      setMessage('')
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+      <main className="chat">
+        <h1>Olga's little chat</h1>
+
+        <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              sendMessage()
+            }}
         >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+            <select
+                value={sender}
+                onChange={(event) => setSender(event.target.value)}
+            >
+                <option value="Ольга">Ольга</option>
+                <option value="Друг">Друг</option>
+            </select>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            <input
+              type="text"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Введи повідомлення..."
+          />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          <button type="submit">Надіслати</button>
+        </form>
+
+          <section className="messages">
+              {messages.map((item) => (
+
+                  <div
+                      key={item.id}
+                      className={`message ${item.sender === 'Ольга' ? 'my-message' : 'other-message'}`}
+                  >
+                      <strong className="message-sender">
+                          {item.sender || 'Невідомий автор'}
+                      </strong>
+
+                      <div>{item.text}</div>
+
+                      <small>
+                          {item.createdAt?.toDate
+                              ? item.createdAt.toDate().toLocaleTimeString('uk-UA', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                              })
+                              : '...'}
+                      </small>
+                  </div>
+              ))}
+              <div ref={messagesEndRef} />
+          </section>
+      </main>
   )
 }
 
